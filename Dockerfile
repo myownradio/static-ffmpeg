@@ -145,7 +145,7 @@ ARG RAV1E_SHA256=c3ea1a2275f09c8a8964084c094d81f01c07fb405930633164ba69d0613a900
 ARG SRT_VERSION=1.4.2
 ARG SRT_URL="https://github.com/Haivision/srt/archive/v${SRT_VERSION}.tar.gz"
 ARG SRT_SHA256=28a308e72dcbb50eb2f61b50cc4c393c413300333788f3a8159643536684a0c4
-# bump: ???
+# bump: libmodplug /LIBMODPLUG_VERSION=([\d.]+)/ fetch:https://sourceforge.net/projects/modplug-xmms/files/|/libmodplug-([\d.]+).tar.gz/
 ARG LIBMODPLUG_VERSION=0.8.9.0
 ARG LIBMODPLUG_URL="https://downloads.sourceforge.net/modplug-xmms/libmodplug-$LIBMODPLUG_VERSION.tar.gz"
 ARG LIBMODPLUG_SHA256=457ca5a6c179656d66c01505c0d95fafaead4329b9dbaa0f997d00a3508ad9de
