@@ -1,0 +1,30 @@
+name: Build multi-arch image on AWS spot instances
+
+on: [push]
+
+jobs:
+  init:
+    name: Install terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup
+        run: sudo snap install terraform
+  spawn-spots:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_docker_login: ${{ secrets.DOCKER_LOGIN }}
+      TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
+      TF_VAR_docker_image: ${{ secrets.DOCKER_IMAGE }}
+      TF_VAR_repository_url: ${{ github.repositoryUrl }}
+      TF_VAR_checkout: ${{ github.sha }}
+    steps:
+      -
+        name: "Terraform: Init"
+        uses: hashicorp/terraform-github-actions@master
+        with:
+          tf_actions_version: 0.12.20
+          tf_actions_subcommand: 'init'
+          tf_actions_working_dir: 'terraform'
+          tf_actions_comment: true
