@@ -2,29 +2,111 @@ name: Build multi-arch image on AWS spot instances
 
 on: [push]
 
+concurrency:
+  cancel-in-progress: false
+  group: run-on-spot
+
 jobs:
-  init:
-    name: Install terraform
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup
-        run: sudo snap install terraform
   spawn-spots:
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      TF_VAR_docker_login: ${{ secrets.DOCKER_LOGIN }}
-      TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
-      TF_VAR_docker_image: ${{ secrets.DOCKER_IMAGE }}
+      TF_VAR_docker_login: ${{ secrets.DOCKERHUB_USERNAME }}
+      TF_VAR_docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
+      TF_VAR_docker_image: ${{ secrets.DOCKERHUB_IMAGE }}
+      TF_VAR_repository_url: ${{ github.repositoryUrl }}
+      TF_VAR_checkout: ${{ github.sha }}
+    outputs:
+      AMD64_INSTANCE: ${{ steps.outputs.outputs.AMD64_INSTANCE }}
+      ARM64_INSTANCE: ${{ steps.outputs.outputs.ARM64_INSTANCE }}
+      PRIVATE_KEY: ${{ env.PRIVATE_KEY }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@master
+      -
+        name: "Terraform: Setup"
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.1.5
+          terraform_wrapper: false
+      -
+        name: "Terraform: Init"
+        run: terraform -chdir=terraform init
+      -
+        name: "Terraform: Apply"
+        run: terraform -chdir=terraform apply -auto-approve
+      -
+        name: "Save Terraform State File"
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: terraform-state
+          path: terraform/terraform.tfstate
+          retention-days: 1
+      -
+        id: outputs
+        name: "Terraform: Parse Outputs"
+        run: |
+          PUBLIC_KEY=$(terraform -chdir=terraform output public_key)
+          PRIVATE_KEY=$(terraform -chdir=terraform output private_key)
+          INSTANCES=$(terraform -chdir=terraform output --json instances)
+
+          echo "PRIVATE_KEY<<EOF" >> $GITHUB_ENV
+          echo "$PRIVATE_KEY" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "::set-output name=AMD64_INSTANCE::$(echo $INSTANCES | jq -r '.amd64')"
+          echo "::set-output name=ARM64_INSTANCE::$(echo $INSTANCES | jq -r '.arm64')"
+
+  ssh:
+    runs-on: ubuntu-latest
+    needs:
+      - spawn-spots
+    steps:
+      -
+        name: Execute Remote SSH Command
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ needs.spawn-spots.outputs.ARM64_INSTANCE }}
+          username: ubuntu
+          key: ${{ needs.spawn-spots.outputs.PRIVATE_KEY }}
+          script: uname -a
+
+  destroy-spots:
+    runs-on: ubuntu-latest
+    needs:
+      - spawn-spots
+      - ssh
+    if: ${{ always() }}
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_docker_login: ${{ secrets.DOCKERHUB_USERNAME }}
+      TF_VAR_docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
+      TF_VAR_docker_image: ${{ secrets.DOCKERHUB_IMAGE }}
       TF_VAR_repository_url: ${{ github.repositoryUrl }}
       TF_VAR_checkout: ${{ github.sha }}
     steps:
       -
-        name: "Terraform: Init"
-        uses: hashicorp/terraform-github-actions@master
+        name: Checkout
+        uses: actions/checkout@master
+      -
+        name: "Download Terraform State File"
+        uses: actions/download-artifact@v2
         with:
-          tf_actions_version: 0.12.20
-          tf_actions_subcommand: 'init'
-          tf_actions_working_dir: 'terraform'
-          tf_actions_comment: true
+          name: terraform-state
+          path: terraform
+      -
+        name: "Terraform: Setup"
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.1.5
+          terraform_wrapper: false
+      -
+        name: "Terraform: Init"
+        run: terraform -chdir=terraform init
+      -
+        name: "Terraform: Destroy"
+        run: terraform -chdir=terraform destroy -auto-approve

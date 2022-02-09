@@ -8,7 +8,7 @@ output "public_key" {
   sensitive = true
 }
 
-output "instances_public_ip" {
-  value = [for spot in aws_spot_instance_request.spot : spot.public_ip]
+output "instances" {
+  value     = { for arch, spot in aws_spot_instance_request.spot : arch => spot.public_ip }
   sensitive = false
 }
