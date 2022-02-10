@@ -70,6 +70,9 @@ jobs:
         PUBLIC_IP: ${{ fromJSON(needs.spawn-spots.outputs.PUBLIC_IPS) }}
     env:
       PUBLIC_IP: ${{ matrix.PUBLIC_IP }}
+      REPOSITIRY_URL: ${{ github.repositoryUrl }}
+      CHECKOUT: ${{ github.sha }}
+      DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_IMAGE }}
     steps:
       -
         name: Setup SSH client
@@ -89,8 +92,14 @@ jobs:
           SSH_HOST: ${{ env.PUBLIC_IP }}
           PRIVATE_KEY: ${{ needs.spawn-spots.outputs.PRIVATE_KEY }}
       -
-        name: Execute remote SSH command
-        run: ssh spot 'uname -a'
+        name: Checkout on spot instance
+        run: ssh spot 'mkdir ~/code && git clone -b "$CHECKOUT" "$REPOSITIRY_URL" ~/code'
+      -
+        name: Build docker image on spot instance
+        run: ssh spot 'sudo docker build -t $DOCKERHUB_IMAGE:latest-$(arch) ~/code'
+      -
+        name: Push docker image from spot instance
+        run: ssh spot 'sudo docker push $DOCKERHUB_IMAGE:latest-$(arch)'
 
   destroy-spots:
     runs-on: ubuntu-latest
