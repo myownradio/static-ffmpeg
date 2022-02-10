@@ -3,12 +3,7 @@ output "private_key" {
   sensitive = true
 }
 
-output "public_key" {
-  value     = tls_private_key.builder_key.public_key_openssh
-  sensitive = true
-}
-
-output "instances" {
-  value     = { for arch, spot in aws_spot_instance_request.spot : arch => spot.public_ip }
+output "public_ips" {
+  value     = [ for spot in aws_spot_instance_request.spot : spot.public_ip ]
   sensitive = false
 }
