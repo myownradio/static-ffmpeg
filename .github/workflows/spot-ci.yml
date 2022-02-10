@@ -1,6 +1,6 @@
 name: Build multi-arch image on AWS spot instances
 
-on: [push]
+on: workflow_dispatch
 
 concurrency:
   cancel-in-progress: false
