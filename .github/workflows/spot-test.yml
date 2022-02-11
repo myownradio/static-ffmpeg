@@ -9,16 +9,28 @@ concurrency:
   group: run-on-spot
 
 jobs:
+  get-image-tag:
+    name: Get image tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@master
+      - name: setup variables
+        id: vars
+        run: |
+          echo "::set-output name=date::$(date +'%y.%m.%d%H%m')"
+          echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+    outputs:
+      image_tag: ${{ steps.vars.outputs.date }}-${{ steps.vars.outputs.sha_short }}
+
   spawn-spots:
+    name: Spawn spot machines
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       TF_VAR_docker_login: ${{ secrets.DOCKERHUB_USERNAME }}
       TF_VAR_docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
-      TF_VAR_docker_image: ${{ secrets.DOCKERHUB_IMAGE }}
-      TF_VAR_repository_url: ${{ github.repositoryUrl }}
-      TF_VAR_checkout: ${{ github.sha }}
     outputs:
       PUBLIC_IPS: ${{ env.PUBLIC_IPS }}
       PRIVATE_KEY: ${{ env.PRIVATE_KEY }}
@@ -62,9 +74,11 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
 
   build:
+    name: Build and push image (${{ steps.variables.outputs.arch }})
     runs-on: ubuntu-latest
     needs:
       - spawn-spots
+      - get-image-tag
     strategy:
       matrix:
         PUBLIC_IP: ${{ fromJSON(needs.spawn-spots.outputs.PUBLIC_IPS) }}
@@ -73,6 +87,7 @@ jobs:
       REPOSITIRY_URL: ${{ github.repositoryUrl }}
       CHECKOUT: ${{ github.sha }}
       DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_IMAGE }}
+      IMAGE_TAG: ${{ needs.get-image-tag.outputs.image_tag }}
     steps:
       -
         name: Setup SSH client
@@ -91,26 +106,34 @@ jobs:
           SSH_USER: ubuntu
           SSH_HOST: ${{ env.PUBLIC_IP }}
           PRIVATE_KEY: ${{ needs.spawn-spots.outputs.PRIVATE_KEY }}
+      _
+        id: variables
+        name: Setup variables
+        run: |
+          echo "::set-output name=arch::$(ssh spot arch)"
       -
         name: Checkout on spot instance
         run: ssh spot "mkdir ~/code && git clone \"$REPOSITIRY_URL\" ~/code && cd ~/code && git checkout \"$CHECKOUT\""
       -
         name: Build docker image on spot instance
-        run: ssh spot "sudo docker build -t \"$DOCKERHUB_IMAGE:latest-$(arch)\" ~/code"
+        run: ssh spot "sudo docker build -t \"$DOCKERHUB_IMAGE:$IMAGE_TAG-$(arch)\" ~/code"
       -
         name: Push docker image from spot instance
-        run: ssh spot "sudo docker push \"$DOCKERHUB_IMAGE:latest-$(arch)\""
+        run: ssh spot "sudo docker push \"$DOCKERHUB_IMAGE:$IMAGE_TAG-$(arch)\""
 
   manifest:
+    name: Create and push multiarch manifest
     runs-on: ubuntu-latest
     needs:
       - spawn-spots
       - build
+      - get-image-tag
     env:
       PUBLIC_IP: ${{ fromJSON(needs.spawn-spots.outputs.PUBLIC_IPS)[0] }}
       REPOSITIRY_URL: ${{ github.repositoryUrl }}
       CHECKOUT: ${{ github.sha }}
       DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_IMAGE }}
+      IMAGE_TAG: ${{ needs.get-image-tag.outputs.image_tag }}
     steps:
       -
         name: Setup SSH client
@@ -132,12 +155,13 @@ jobs:
       -
         name: Create multiarch docker manifest
         # @todo Take x86_64 and arm64 as variables from previous steps
-        run: ssh spot "sudo docker manifest create \"$DOCKERHUB_IMAGE:latest\" --amend \"$DOCKERHUB_IMAGE:latest-x86_64\" --amend \"$DOCKERHUB_IMAGE:latest-arm64\""
+        run: ssh spot "sudo docker manifest create \"$DOCKERHUB_IMAGE:$IMAGE_TAG\" --amend \"$DOCKERHUB_IMAGE:$IMAGE_TAG-x86_64\" --amend \"$DOCKERHUB_IMAGE:$IMAGE_TAG-arm64\""
       -
         name: Push docker manifest
-        run: ssh spot "sudo docker manifest push \"$DOCKERHUB_IMAGE:latest\""
+        run: ssh spot "sudo docker manifest push \"$DOCKERHUB_IMAGE:$IMAGE_TAG\""
 
   destroy-spots:
+    name: Destroy spot machines
     runs-on: ubuntu-latest
     needs:
       - spawn-spots
