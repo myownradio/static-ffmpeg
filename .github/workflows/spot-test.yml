@@ -106,7 +106,7 @@ jobs:
           SSH_USER: ubuntu
           SSH_HOST: ${{ env.PUBLIC_IP }}
           PRIVATE_KEY: ${{ needs.spawn-spots.outputs.PRIVATE_KEY }}
-      _
+      -
         id: variables
         name: Setup variables
         run: |
