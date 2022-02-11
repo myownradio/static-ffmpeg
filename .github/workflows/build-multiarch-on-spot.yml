@@ -166,9 +166,6 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       TF_VAR_docker_login: ${{ secrets.DOCKERHUB_USERNAME }}
       TF_VAR_docker_password: ${{ secrets.DOCKERHUB_TOKEN }}
-      TF_VAR_docker_image: ${{ secrets.DOCKERHUB_IMAGE }}
-      TF_VAR_repository_url: ${{ github.repositoryUrl }}
-      TF_VAR_checkout: ${{ github.sha }}
     steps:
       -
         name: Checkout
