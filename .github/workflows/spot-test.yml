@@ -149,8 +149,8 @@ jobs:
           PRIVATE_KEY: ${{ needs.spawn-spots.outputs.PRIVATE_KEY }}
       -
         name: Create multiarch docker manifest
-        # @todo Take x86_64 and arm64 as variables from previous steps
-        run: ssh spot "sudo docker manifest create \"$DOCKERHUB_IMAGE:$IMAGE_TAG\" --amend \"$DOCKERHUB_IMAGE:$IMAGE_TAG-x86_64\" --amend \"$DOCKERHUB_IMAGE:$IMAGE_TAG-arm64\""
+        # @todo Take x86_64 and aarch64 as variables from previous steps
+        run: ssh spot "sudo docker manifest create \"$DOCKERHUB_IMAGE:$IMAGE_TAG\" --amend \"$DOCKERHUB_IMAGE:$IMAGE_TAG-x86_64\" --amend \"$DOCKERHUB_IMAGE:$IMAGE_TAG-aarch64\""
       -
         name: Push docker manifest
         run: ssh spot "sudo docker manifest push \"$DOCKERHUB_IMAGE:$IMAGE_TAG\""
