@@ -6,7 +6,7 @@ variable "environment" {
   default = {
     amd64 = {
       arch : "x86_64",
-      instance_type : "c4.xlarge"
+      instance_type : "c5.xlarge"
     },
     arm64 = {
       arch : "arm64",
@@ -88,12 +88,6 @@ resource "aws_spot_instance_request" "spot" {
 
       // Authenticate on the Docker Hub
       "sudo docker login -u=\"${var.docker_login}\" -p=\"${var.docker_password}\"",
-
-      // Build and push image using docker
-      // "cd ~ && mkdir code && cd code",
-      // "git clone -b ${var.checkout} ${var.repository_url} .",
-      // "sudo docker build -t ${var.docker_image}:latest-${each.value.arch} .",
-      // "sudo docker push ${var.docker_image}:latest-${each.value.arch}"
     ]
   }
 }
