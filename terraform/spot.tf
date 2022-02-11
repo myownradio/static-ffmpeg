@@ -1,16 +1,16 @@
 variable "environment" {
   type = map(object({
-    arch: string,
-    instance_type: string
+    arch : string,
+    instance_type : string
   }))
   default = {
     amd64 = {
-      arch: "x86_64",
-      instance_type: "c4.xlarge"
+      arch : "x86_64",
+      instance_type : "c5.xlarge"
     },
     arm64 = {
-      arch: "arm64",
-      instance_type: "c6g.xlarge"
+      arch : "arm64",
+      instance_type : "c6g.xlarge"
     }
   }
 }
@@ -54,12 +54,12 @@ resource "aws_key_pair" "spot_key" {
 resource "aws_spot_instance_request" "spot" {
   for_each = var.environment
 
-  ami = data.aws_ami.builder[each.key].id
+  ami           = data.aws_ami.builder[each.key].id
   instance_type = each.value.instance_type
 
   associate_public_ip_address = true
-  wait_for_fulfillment = true
-  spot_type = "one-time"
+  wait_for_fulfillment        = true
+  spot_type                   = "one-time"
 
   key_name = aws_key_pair.spot_key.key_name
 
@@ -72,9 +72,9 @@ resource "aws_spot_instance_request" "spot" {
   }
 
   connection {
-    type     = "ssh"
-    user     = "ubuntu"
-    host     = self.public_ip
+    type        = "ssh"
+    user        = "ubuntu"
+    host        = self.public_ip
     private_key = tls_private_key.builder_key.private_key_pem
   }
 
@@ -88,12 +88,6 @@ resource "aws_spot_instance_request" "spot" {
 
       // Authenticate on the Docker Hub
       "sudo docker login -u=\"${var.docker_login}\" -p=\"${var.docker_password}\"",
-
-      // Build and push image using docker
-      "cd ~ && mkdir code && cd code",
-      "git clone -b ${var.checkout} ${var.repository_url} .",
-      "sudo docker build -t ${var.docker_image}:latest-${each.value.arch} .",
-      "sudo docker push ${var.docker_image}:latest-${each.value.arch}"
     ]
   }
 }
