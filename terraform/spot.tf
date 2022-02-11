@@ -27,7 +27,7 @@ data "aws_ami" "builder" {
   }
 
   filter {
-    name = "name"
+    name   = "name"
     values = [
       "ubuntu/images/hvm-ssd/ubuntu-focal-20.04-*-server-*",
     ]
